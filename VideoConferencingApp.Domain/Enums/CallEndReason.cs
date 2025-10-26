@@ -1,0 +1,18 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace VideoConferencingApp.Domain.Enums
+{
+    public enum CallEndReason
+    {
+        UserHangup,
+        UserBusy,
+        UserDeclined,
+        ConnectionLost,
+        Timeout
+    }
+
+}

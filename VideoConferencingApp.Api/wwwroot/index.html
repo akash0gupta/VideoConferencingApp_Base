@@ -1,0 +1,280 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Video Call</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+            .header h1 {
+                color: #667eea;
+                margin-bottom: 10px;
+            }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+        }
+
+        .sidebar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            height: fit-content;
+        }
+
+            .sidebar h2 {
+                color: #333;
+                margin-bottom: 15px;
+                font-size: 18px;
+            }
+
+        .user-list {
+            list-style: none;
+        }
+
+        .user-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #f3f4f6;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+            .user-item.busy {
+                opacity: 0.5;
+            }
+
+        .call-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+            .call-btn:hover {
+                background: #059669;
+            }
+
+            .call-btn:disabled {
+                background: #d1d5db;
+                cursor: not-allowed;
+            }
+
+        .video-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .video-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .video-wrapper {
+            position: relative;
+            background: #1f2937;
+            border-radius: 10px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .control-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+            .control-btn.end-call {
+                background: #ef4444;
+                color: white;
+            }
+
+                .control-btn.end-call:hover {
+                    background: #dc2626;
+                }
+
+            .control-btn:disabled {
+                background: #d1d5db;
+                cursor: not-allowed;
+            }
+
+        .incoming-call-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+            .incoming-call-modal.show {
+                display: flex;
+            }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            max-width: 400px;
+        }
+
+            .modal-content h2 {
+                color: #333;
+                margin-bottom: 20px;
+            }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .accept-btn {
+            background: #10b981;
+            color: white;
+        }
+
+        .reject-btn {
+            background: #ef4444;
+            color: white;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎥 WebRTC Video Call</h1>
+            <div class="user-info">
+                <span class="status-indicator"></span>
+                <span id="currentUser">Not connected</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="sidebar">
+                <h2>Online Users</h2>
+                <ul class="user-list" id="userList">
+                    <li style="text-align: center; color: #9ca3af;">No users online</li>
+                </ul>
+            </div>
+
+            <div class="video-container">
+                <div class="video-grid">
+                    <div class="video-wrapper">
+                        <video id="localVideo" autoplay muted playsinline></video>
+                        <div class="video-label">You</div>
+                    </div>
+                    <div class="video-wrapper">
+                        <video id="remoteVideo" autoplay playsinline></video>
+                        <div class="video-label" id="remoteLabel">Waiting for connection...</div>
+                    </div>
+                </div>
+                <div class="controls">
+                    <button class="control-btn end-call" id="endCallBtn" disabled>End Call</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Incoming Call Modal -->
+    <div class="incoming-call-modal" id="incomingCallModal">
+        <div class="modal-content">
+            <h2>📞 Incoming Call</h2>
+            <p id="callerName" style="font-size: 20px; margin-bottom: 20px;"></p>
+            <div class="modal-actions">
+                <button class="control-btn accept-btn" id="acceptCallBtn">Accept</button>
+                <button class="control-btn reject-btn" id="rejectCallBtn">Reject</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="microsoft-signalr/signalr.min.js"></script>
+    <script src="secure-app.js"></script>
+</body>
+</html>
