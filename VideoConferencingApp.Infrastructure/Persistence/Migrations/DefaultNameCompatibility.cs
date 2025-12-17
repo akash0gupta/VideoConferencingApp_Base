@@ -1,4 +1,4 @@
-﻿using VideoConferencingApp.Domain.Entities.User;
+﻿using VideoConferencingApp.Domain.Entities.UserEntities;
 
 namespace VideoConferencingApp.Infrastructure.Persistence.Migrations
 {

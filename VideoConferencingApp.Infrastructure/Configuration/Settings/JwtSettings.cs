@@ -1,4 +1,4 @@
-﻿using VideoConferencingApp.Application.Interfaces.Common.ICommonServices;
+﻿using VideoConferencingApp.Application.Common.ICommonServices;
 
 namespace VideoConferencingApp.Infrastructure.Configuration.Settings
 {

@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using VideoConferencingApp.Infrastructure.Configuration;
 using VideoConferencingApp.Infrastructure.Configuration.Settings;
 
 namespace VideoConferencingApp.Infrastructure.Messaging.Kafka
@@ -13,10 +14,10 @@ namespace VideoConferencingApp.Infrastructure.Messaging.Kafka
         private readonly object _lock = new();
 
         public KafkaConnection(
-            IOptions<MessageBrokerSettings> settings,
+            AppSettings settings,
             ILogger<KafkaConnection> logger)
         {
-            _settings = settings.Value;
+            _settings = settings.Get<MessageBrokerSettings>();
             _logger = logger;
         }
 

@@ -99,5 +99,7 @@ namespace VideoConferencingApp.Domain.Interfaces
             int pageSize,
             Expression<Func<TEntity, bool>>? predicate = null,
             Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>>? orderBy = null);
+
+        Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate);
     }
 }

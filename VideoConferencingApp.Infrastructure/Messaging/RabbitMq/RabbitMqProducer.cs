@@ -11,8 +11,9 @@ using Microsoft.Extensions.DependencyInjection;
 using RabbitMQ.Client.Events;
 using VideoConferencingApp.Infrastructure.Configuration.Settings;
 using VideoConferencingApp.Domain.Events;
-using VideoConferencingApp.Application.Interfaces.Common.IEventHandlerServices;
-using VideoConferencingApp.Application.Interfaces.Common.ICommonServices;
+using VideoConferencingApp.Application.Common.ICommonServices;
+using VideoConferencingApp.Application.Common.IEventHandlerServices;
+using VideoConferencingApp.Infrastructure.Configuration;
 
 namespace VideoConferencingApp.Infrastructure.Messaging.RabbitMq
 {
@@ -27,12 +28,12 @@ namespace VideoConferencingApp.Infrastructure.Messaging.RabbitMq
 
         public RabbitMqProducer(
             RabbitMqConnection connection,
-            IOptions<MessageBrokerSettings> settings,
+            AppSettings settings,
             IServiceProvider serviceProvider,
             ILogger<RabbitMqProducer> logger)
         {
             _connection = connection;
-            _settings = settings.Value;
+            _settings = settings.Get<MessageBrokerSettings>();
             _serviceProvider = serviceProvider;
             _logger = logger;
         }

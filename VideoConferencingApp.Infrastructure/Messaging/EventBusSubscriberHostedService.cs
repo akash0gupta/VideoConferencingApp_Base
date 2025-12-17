@@ -1,10 +1,10 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using VideoConferencingApp.Application.Common.ICommonServices;
 using VideoConferencingApp.Application.EventHandlers;
 using VideoConferencingApp.Application.EventHandlers.Notifications;
 using VideoConferencingApp.Application.Events;
-using VideoConferencingApp.Application.Interfaces.Common.ICommonServices;
 using VideoConferencingApp.Domain.Events.ContactEvents;
 using VideoConferencingApp.Domain.Events.Notification;
 
@@ -37,7 +37,7 @@ namespace VideoConferencingApp.Infrastructure.Messaging
                 // Notification Event Subscriptions
                 messageBus.Subscribe<SendEmailNotificationEvent, EmailNotificationHandler>();
                 messageBus.Subscribe<SendSmsNotificationEvent, SmsNotificationHandler>();
-                messageBus.Subscribe<SendPushNotificationEvent, PushNotificationHandler>();
+                messageBus.Subscribe<SendFirebasePushNotificationEvent, FirebasePushNotificationHandler>();
             }
 
             _logger.LogInformation("Event Bus Subscriber Service has started and subscriptions are configured.");

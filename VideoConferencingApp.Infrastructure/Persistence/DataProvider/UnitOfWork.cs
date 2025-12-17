@@ -9,11 +9,14 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
-using VideoConferencingApp.Application.Interfaces.Common.ICommonServices;
+using VideoConferencingApp.Application.Common.ICommonServices;
 using VideoConferencingApp.Domain.Entities;
+using VideoConferencingApp.Domain.Interfaces;
+using VideoConferencingApp.Infrastructure.Persistence.DataProvider.Repositories;
 
 namespace VideoConferencingApp.Infrastructure.Persistence.DataProvider
 {
+
     public class UnitOfWork : IUnitOfWork
     {
         private readonly BaseDataProvider _dataProvider;
@@ -118,7 +121,7 @@ namespace VideoConferencingApp.Infrastructure.Persistence.DataProvider
         {
             _commands.Add(async () =>
             {
-                entity.Id = await _dataConnection.InsertWithInt64IdentityAsync(entity);
+                await _dataConnection.InsertAsync(entity);
             });
         }
 
@@ -200,4 +203,5 @@ namespace VideoConferencingApp.Infrastructure.Persistence.DataProvider
 
         #endregion
     }
+
 }

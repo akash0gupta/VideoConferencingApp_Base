@@ -1,6 +1,6 @@
 ﻿using FluentMigrator.Runner;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.Extensions.Caching.StackExchangeRedis;
+using Mapster;
+using MapsterMapper;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -11,40 +11,139 @@ using Microsoft.OpenApi.Models;
 using StackExchange.Redis;
 using System.Reflection;
 using System.Text;
+using VideoConferencingApp.Application.Common.IAuthServices;
+using VideoConferencingApp.Application.Common.ICommonServices;
+using VideoConferencingApp.Application.Common.IEventHandlerServices;
+using VideoConferencingApp.Application.Common.INotificationServices;
 using VideoConferencingApp.Application.EventHandlers;
 using VideoConferencingApp.Application.Events;
-using VideoConferencingApp.Application.Interfaces;
-using VideoConferencingApp.Application.Interfaces.Common.IAuthServices;
-using VideoConferencingApp.Application.Interfaces.Common.ICommonServices;
-using VideoConferencingApp.Application.Interfaces.Common.IEventHandlerServices;
-using VideoConferencingApp.Application.Interfaces.Common.INotificationServices;
-using VideoConferencingApp.Application.Interfaces.Common.IRealTimeServices;
-using VideoConferencingApp.Application.Interfaces.Common.IUserServices;
-using VideoConferencingApp.Application.Services;
+using VideoConferencingApp.Application.Services.ContactServices;
+using VideoConferencingApp.Application.Services.FileServices;
+using VideoConferencingApp.Application.Services.MessagingServices;
+using VideoConferencingApp.Application.Services.UserServices;
 using VideoConferencingApp.Domain.Interfaces;
-using VideoConferencingApp.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.SignalR.StackExchangeRedis;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using VideoConferencingApp.Infrastructure.Caching;
-using VideoConferencingApp.Infrastructure.Caching.Presence;
 using VideoConferencingApp.Infrastructure.Configuration;
 using VideoConferencingApp.Infrastructure.Configuration.HealthChecks;
 using VideoConferencingApp.Infrastructure.Configuration.Redis;
 using VideoConferencingApp.Infrastructure.Configuration.Settings;
 using VideoConferencingApp.Infrastructure.EventsPublisher;
+using VideoConferencingApp.Infrastructure.FileDocumentManager;
 using VideoConferencingApp.Infrastructure.Messaging;
+using VideoConferencingApp.Infrastructure.Messaging.InMemory;
 using VideoConferencingApp.Infrastructure.Messaging.Kafka;
 using VideoConferencingApp.Infrastructure.Messaging.RabbitMq;
-using VideoConferencingApp.Infrastructure.Notifications;
 using VideoConferencingApp.Infrastructure.Persistence.DataProvider;
 using VideoConferencingApp.Infrastructure.Persistence.DataProvider.Repositories;
 using VideoConferencingApp.Infrastructure.Persistence.Migrations;
-using VideoConferencingApp.Infrastructure.RealTime;
 using VideoConferencingApp.Infrastructure.Services;
-using VideoConferencingApp.Services;
+using VideoConferencingApp.Infrastructure.Services.AuthServices;
+using VideoConferencingApp.Infrastructure.Services.NotificationServices;
+
 
 namespace VideoConferencingApp.Infrastructure.Extensions
 {
     public static class ServiceCollectionExtensions
     {
+        public static IServiceCollection AddInfrastructure(this IServiceCollection services)
+        {
+            // --- Ensure AppSettings is registered first ---
+            var sp = services.BuildServiceProvider();
+            var appSettings = sp.GetService<AppSettings>()
+                ?? throw new InvalidOperationException("AddAutoConfigurations must be called before AddInfrastructure.");
+
+            services.AddJwtAuthentication();
+            services.AddCorsConfiguration();
+            services.AddSwagger();
+            services.AddApplicationMappings();
+            services.RegisterFileDocumentManager();
+
+
+            // --- Database Settings ---
+            services.DataBaseSettings(appSettings);
+
+            // --- Cache Services ---
+            services.RegisterCacheServices(appSettings);
+
+            // --- Message Broker ---
+            services.RegisterMessageBroker(appSettings);
+
+            // --- Health Checks ---
+            services.RegisterHealthChecks();
+
+            // --- Auto-register all Event Handlers using Scrutor ---
+            services.Scan(scan => scan
+                .FromAssemblyOf<ContactRequestAcceptedEventHandler>()
+                .AddClasses(classes => classes.AssignableTo(typeof(IEventHandler<>)))
+                .AsSelfWithInterfaces()
+                .WithScopedLifetime());
+
+            // --- Application Services ---
+            //Add SignalR with security options
+            services.AddSignalR(options =>
+            {
+                options.KeepAliveInterval = TimeSpan.FromSeconds(10);
+                options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+                options.MaximumReceiveMessageSize = 102400; // 100 KB limit
+                options.StreamBufferCapacity = 10;
+            });
+
+            // Register services
+            services.AddSingleton<IFirebasePushNotificationService,FirebasePushNotificationService>();
+            services.AddSingleton<IRateLimitService, RateLimitService>();
+            services.AddHttpContextAccessor();
+            services.AddScoped<IJwtAuthenticationService, JwtAuthenticationService>();
+            services.AddScoped<IBCryptPasswordServices,BCryptPasswordServices>();
+            services.AddScoped<IAuthService, AuthService>();
+            services.AddSingleton<IEmailService, EmailService>();
+            services.AddSingleton<ISmsService, SmsService>();
+            services.AddSingleton<IEventValidator, EventValidator>();
+            services.AddSingleton<BaseDataProvider, SqlServerDataProvider>();
+            services.AddSingleton<INameCompatibility, DefaultNameCompatibility>();
+            services.AddScoped<IEventPublisher, EventPublisher>();
+            services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+            services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IContactService, ContactService>();
+            services.AddScoped<ICurrentUserService, CurrentUserService>();
+            services.AddScoped<IHttpContextService, HttpContextService>();
+            services.AddScoped<IResponseHeaderService, ResponseHeaderService>();
+            services.AddScoped<IUserDeviceTokenService,UserDeviceTokenService>();
+            services.AddScoped<IUserFileManagerService,UserFileManagerService>();
+            services.AddScoped<IFileManagerService,FileManagerService>();
+            services.AddScoped<INotificationOrchestrator,NotificationOrchestrator>();
+
+            services.AddScoped<IConnectionManagerService, ConnectionManagerService>();
+            services.AddScoped<IPresenceService, PresenceService>();
+            services.AddScoped<IChatService, ChatService>();
+            services.AddScoped<ICallService, CallService>();
+            services.AddScoped<IGroupService, GroupService>();
+            services.AddScoped<IAuditLogger, AuditLogger>();
+            return services;
+        }
+        public static IServiceCollection AddSignalRConfiguration(
+            this IServiceCollection services,
+             AppSettings appSettings)
+        {
+            var redisConnection = appSettings.Get<RedisSettings>();
+
+            services.AddSignalR(options =>
+            {
+                options.EnableDetailedErrors = true;
+                options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+                options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+                options.HandshakeTimeout = TimeSpan.FromSeconds(15);
+                options.MaximumReceiveMessageSize = 102400; // 100 KB
+            })
+            .AddStackExchangeRedis(redisConnectionString: redisConnection.ConnectionStrings["presence"], options =>
+            {
+                options.Configuration.ChannelPrefix = "hubs";
+            });
+
+            return services;
+        }
         public static IServiceCollection AddAutoConfigurations(this IServiceCollection services, IConfiguration configuration)
         {
             var appSettings = new AppSettings();
@@ -72,7 +171,41 @@ namespace VideoConferencingApp.Infrastructure.Extensions
 
             return services;
         }
+        public static IServiceCollection RegisterFileDocumentManager(this IServiceCollection services)
+        {
+            // --- Ensure AppSettings is registered first ---
+            var sp = services.BuildServiceProvider();
+            var appSettings = sp.GetService<AppSettings>()
+                ?? throw new InvalidOperationException("AddAutoConfigurations must be called before AddInfrastructure.");
 
+            var storageProvider = appSettings.Get<FileDocumentSettings>();
+
+            switch (storageProvider.StorageProvider)
+            {
+                case StorageProvider.azureblob:
+                    if (storageProvider.azureBlobStorageSettings == null)
+                        throw new InvalidOperationException("Azure Blob Storage settings are not configured.");
+                    services.AddSingleton<IFileStorageService>(_ => new AzureBlobStorageService(storageProvider.azureBlobStorageSettings.ConnectionString, storageProvider.azureBlobStorageSettings.ContainerName));
+                    break;
+
+                case StorageProvider.local:
+                default:
+                    var basePath = string.IsNullOrWhiteSpace(storageProvider.PathFolder) ? "wwwroot/uploads" : storageProvider.PathFolder;
+                    services.AddSingleton<IFileStorageService>(_ => new LocalStorageService(basePath));
+                    break;
+            }
+
+            return services;
+        }
+        public static IServiceCollection AddApplicationMappings(
+            this IServiceCollection services)
+        {
+            TypeAdapterConfig.GlobalSettings.Scan(Assembly.GetExecutingAssembly());
+
+            services.AddSingleton<IMapper>(new Mapper(TypeAdapterConfig.GlobalSettings));
+
+            return services;
+        }
         public static void AddJwtAuthentication(this IServiceCollection services)
         {
             // --- Ensure AppSettings is registered first ---
@@ -116,7 +249,6 @@ namespace VideoConferencingApp.Infrastructure.Extensions
                         {
                             context.Token = accessToken;
                         }
-
                         return Task.CompletedTask;
                     },
                     OnAuthenticationFailed = context =>
@@ -158,7 +290,6 @@ namespace VideoConferencingApp.Infrastructure.Extensions
          });
             });
         }
-
         public static void AddCorsConfiguration(this IServiceCollection services)
         {
             // --- Ensure AppSettings is registered first ---
@@ -166,92 +297,35 @@ namespace VideoConferencingApp.Infrastructure.Extensions
             var appSettings = sp.GetService<AppSettings>()
                 ?? throw new InvalidOperationException("AddAutoConfigurations must be called before AddInfrastructure.");
 
-            var cacheSettings = appSettings.Get<CommonConfig>();
+            var corsDomains = appSettings.Get<CommonConfig>();
             services.AddCors(options =>
             {
-                options.AddPolicy(name: "DefaultCorsPolicy", policy =>
+                options.AddPolicy("DefaultCorsPolicy", builder =>
                 {
-                    if (string.IsNullOrWhiteSpace(cacheSettings.CorsDomains))
+                    if (string.IsNullOrWhiteSpace(corsDomains.CorsDomains))
                     {
-                        policy.WithOrigins();
+                        builder
+                            .AllowAnyHeader()
+                            .AllowAnyMethod()
+                            .SetIsOriginAllowed(_ => true) 
+                            .AllowCredentials();         
                     }
                     else
                     {
-                        var allowedOrigins = cacheSettings.CorsDomains
-                             .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-                             .Select(o => o.Trim())
-                             .ToArray();
-                        policy.WithOrigins(allowedOrigins).AllowAnyOrigin()
-                           .AllowAnyMethod()
-                           .AllowAnyHeader();
+                        var allowedOrigins = corsDomains.CorsDomains
+                            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(x => x.Trim())
+                            .ToArray();
+
+                        builder
+                            .WithOrigins(allowedOrigins)
+                            .AllowAnyMethod()
+                            .AllowAnyHeader()
+                            .AllowCredentials();
                     }
                 });
             });
         }
-
-        public static IServiceCollection AddInfrastructure(this IServiceCollection services)
-        {
-            // --- Ensure AppSettings is registered first ---
-            var sp = services.BuildServiceProvider();
-            var appSettings = sp.GetService<AppSettings>()
-                ?? throw new InvalidOperationException("AddAutoConfigurations must be called before AddInfrastructure.");
-
-            services.AddJwtAuthentication();
-            //services.AddCorsConfiguration();
-            services.AddSwagger();
-
-
-            // --- Database Settings ---
-            services.DataBaseSettings(appSettings);
-
-            // --- Cache Services ---
-            services.RegisterCacheServices(appSettings);
-
-            // --- Message Broker ---
-            services.RegisterMessageBroker(appSettings);
-
-            // --- Health Checks ---
-            services.RegisterHealthChecks();
-
-            // --- Auto-register all Event Handlers using Scrutor ---
-            services.Scan(scan => scan
-                .FromAssemblyOf<ContactRequestAcceptedEventHandler>()
-                .AddClasses(classes => classes.AssignableTo(typeof(IEventHandler<>)))
-                .AsSelfWithInterfaces()
-                .WithScopedLifetime());
-
-            // --- Application Services ---
-            // 📡 Add SignalR with security options
-            services.AddSignalR(options =>
-            {
-                options.KeepAliveInterval = TimeSpan.FromSeconds(10);
-                options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
-                options.MaximumReceiveMessageSize = 102400; // 100 KB limit
-                options.StreamBufferCapacity = 10;
-            });
-
-            // Register services
-            services.AddSingleton<IConnectionManager, ConnectionManager>();
-            services.AddSingleton<IRefreshTokenRepository, InMemoryRefreshTokenRepository>();
-            services.AddSingleton<IRateLimitService, RateLimitService>();
-            services.AddSingleton<IInputValidator, InputValidator>();
-            services.AddSingleton<IAuditLogger, AuditLogger>();
-
-            services.AddHttpContextAccessor();
-            services.AddScoped<IJwtAuthenticationService, JwtAuthenticationService>();
-            services.AddScoped<IAuthService, AuthService>();
-            services.AddSingleton<INotificationService, SignalRNotificationService>();
-            services.AddSingleton<IEmailService,EmailService>();
-            services.AddSingleton<ISmsService,SmsService>();
-            services.AddSingleton<BaseDataProvider, SqlServerDataProvider>();
-            services.AddSingleton<INameCompatibility, DefaultNameCompatibility>();
-            services.AddScoped<IEventPublisher, EventPublisher>();
-            services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
-            services.AddScoped<IUserService, UserService>();
-            services.AddScoped<IContactService, ContactService>();
-            return services;
-        }
-
         private static void DataBaseSettings(this IServiceCollection services, AppSettings appSettings)
         {
             var databaseConfig = appSettings.Get<DataSettings>();
@@ -272,7 +346,6 @@ namespace VideoConferencingApp.Infrastructure.Extensions
 
             services.AddScoped<IUnitOfWork,UnitOfWork>();
         }
-
         private static void RegisterHealthChecks(this IServiceCollection services)
         {
             services.AddHealthChecks()
@@ -280,7 +353,6 @@ namespace VideoConferencingApp.Infrastructure.Extensions
                 .AddCheck<RedisHealthCheck>("redis", tags: new[] { "cache", "redis" })
                 .AddCheck<MessageBrokerHealthCheck>("message_broker", tags: new[] { "messaging" });
         }
-
         private static void RegisterCacheServices(this IServiceCollection services, AppSettings appSettings)
         {
             var cacheSettings = appSettings.Get<CacheSettings>();
@@ -318,30 +390,6 @@ namespace VideoConferencingApp.Infrastructure.Extensions
                     break;
             }
 
-            RegisterPresenceServices(services, appSettings);
-        }
-
-        private static void RegisterPresenceServices(this IServiceCollection services, AppSettings appSettings)
-        {
-            var cacheSettings = appSettings.Get<CacheSettings>();
-            bool useRedis = cacheSettings.PresenceProviderType == CacheProviderType.Hybrid
-                           || cacheSettings.PresenceProviderType == CacheProviderType.Distributed;
-
-            if (useRedis)
-                services.AddSingleton<RedisConnectionManager>();
-
-            switch (cacheSettings.PresenceProviderType)
-            {
-                case CacheProviderType.Hybrid:
-                    services.AddSingleton<IPresenceService, HybridPresenceService>();
-                    break;
-                case CacheProviderType.Distributed:
-                    services.AddSingleton<IPresenceService, RedisPresenceService>();
-                    break;
-                default:
-                    services.AddSingleton<IPresenceService, InMemoryPresenceService>();
-                    break;
-            }
         }
         private static void RegisterMessageBroker(this IServiceCollection services, AppSettings appSettings)
         {

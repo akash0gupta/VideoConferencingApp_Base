@@ -6,6 +6,7 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using RabbitMQ.Client.Exceptions;
 using System.Net.Sockets;
+using VideoConferencingApp.Infrastructure.Configuration;
 using VideoConferencingApp.Infrastructure.Configuration.Settings; // Assuming this is your settings class
 
 namespace VideoConferencingApp.Infrastructure.Messaging.RabbitMq
@@ -18,9 +19,9 @@ namespace VideoConferencingApp.Infrastructure.Messaging.RabbitMq
         private IChannel _channel;
         private readonly object _lock = new object();
 
-        public RabbitMqConnection(IOptions<MessageBrokerSettings> settings, ILogger<RabbitMqConnection> logger)
+        public RabbitMqConnection(AppSettings settings, ILogger<RabbitMqConnection> logger)
         {
-            _settings = settings.Value;
+            _settings = settings.Get<MessageBrokerSettings>();
             _logger = logger;
         }
 
@@ -77,7 +78,7 @@ namespace VideoConferencingApp.Infrastructure.Messaging.RabbitMq
                 autoDelete: false,
                 arguments: null);
 
-            _logger.LogInformation("Exchange '{ExchangeName}' configured", _settings.ExchangeName);
+            _logger.LogInformation("Exchange '{ExchangeName}' configured '{ExchangeType}'", _settings.ExchangeName, _settings.ExchangeType);
         }
 
         public void Dispose()

@@ -1,690 +1,790 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using MapsterMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
+using System.Diagnostics;
 using VideoConferencingApp.Api.DTOs;
-using VideoConferencingApp.Api.Models;
-using VideoConferencingApp.Application.Interfaces;
-using VideoConferencingApp.Domain.DTOs;
-using VideoConferencingApp.Domain.DTOs.Contact;
+using VideoConferencingApp.Api.DTOs.ContactDto;
+using VideoConferencingApp.API.Controllers.Base;
+using VideoConferencingApp.Application.DTOs.Authentication;
+using VideoConferencingApp.Application.DTOs.Contact;
 using VideoConferencingApp.Domain.Enums;
 using VideoConferencingApp.Domain.Exceptions;
 using VideoConferencingApp.Domain.Interfaces;
+using VideoConferencingApp.Application.Services.ContactServices;
+using VideoConferencingApp.Infrastructure.Services.AuthServices;
 
 namespace VideoConferencingApp.Controllers
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    [Authorize]
-    [Produces("application/json")]
-    public class ContactController : ControllerBase
+    public class ContactController : BaseController
     {
         private readonly IContactService _contactService;
-        private readonly ILogger<ContactController> _logger;
+        private readonly IMapper _mappingService;
 
         public ContactController(
             IContactService contactService,
+            IMapper mappingService,
+            ICurrentUserService currentUserService,
+            IHttpContextService httpContextService,
+            IResponseHeaderService responseHeaderService,
             ILogger<ContactController> logger)
+            : base(logger, currentUserService, httpContextService, responseHeaderService)
         {
-            _contactService = contactService;
-            _logger = logger;
+            _contactService = contactService ?? throw new ArgumentNullException(nameof(contactService));
+            _mappingService = mappingService ?? throw new ArgumentNullException(nameof(mappingService));
         }
 
         /// <summary>
         /// Search for users to add as contacts
         /// </summary>
-        /// <param name="query">Search query</param>
-        /// <param name="pageNumber">Page number</param>
-        /// <param name="pageSize">Page size</param>
-        /// <returns>List of users matching the search criteria</returns>
-        [HttpGet("search")]
-        [ProducesResponseType(typeof(IPagedList<UserSearchDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> SearchUsers(
+        [HttpGet]
+        [ProducesResponseType(typeof(ApiResponse<IPagedList<UserSearchDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ApiResponse<IPagedList<UserSearchDto>>>> SearchUsers(
             [FromQuery] string query,
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 20)
         {
             try
             {
-                var userId = GetCurrentUserId();
-                if (!userId.HasValue)
+                if (!IsAuthenticated || !CurrentUserId.HasValue)
                 {
-                    return Unauthorized();
+                    return Failure<IPagedList<UserSearchDto>>(
+                        null,
+                        "User is not authorized.",
+                        StatusCodes.Status401Unauthorized);
                 }
 
                 if (string.IsNullOrWhiteSpace(query))
                 {
-                    return BadRequest(new ErrorResponse
-                    {
-                        Message = "Search query is required",
-                        Code = "INVALID_QUERY"
-                    });
+                    return Failure<IPagedList<UserSearchDto>>(
+                        null,
+                        "Search query is required.",
+                        StatusCodes.Status400BadRequest);
                 }
 
                 var result = await _contactService.SearchUsersAsync(
-                    userId.Value,
+                    CurrentUserId.Value,
                     query,
                     pageNumber,
                     pageSize);
 
-                return Ok(result);
+                // Set pagination headers
+                if (result != null)
+                {
+                    _responseHeaderService.SetPaginationHeaders(new PaginationMetadata
+                    {
+                        CurrentPage = pageNumber,
+                        PageSize = result.PageSize,
+                        TotalPages = result.TotalPages,
+                        TotalCount = result.TotalCount,
+                        HasNext = result.HasNextPage,
+                        HasPrevious = result.HasPreviousPage
+                    });
+                }
+
+                return Success(result, $"Found {result?.TotalCount ?? 0} users");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error searching users");
-                return StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse
-                {
-                    Message = "An error occurred while searching users",
-                    Code = "INTERNAL_ERROR"
-                });
+                _logger.LogError(ex,
+                    "Error searching users - Query: {Query} | UserId: {UserId} | TraceId: {TraceId}",
+                    query, CurrentUserId, TraceId);
+
+                return Failure<IPagedList<UserSearchDto>>(
+                    null,
+                    "An internal error occurred while searching users.",
+                    StatusCodes.Status500InternalServerError);
             }
         }
 
         /// <summary>
         /// Quick search for users (autocomplete)
         /// </summary>
-        /// <param name="query">Search query</param>
-        /// <param name="limit">Maximum results</param>
-        /// <returns>Quick search results</returns>
-        [HttpGet("quick-search")]
-        [ProducesResponseType(typeof(IEnumerable<UserQuickSearchDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> QuickSearch(
+        [HttpGet]
+        [ProducesResponseType(typeof(ApiResponse<IEnumerable<UserQuickSearchDto>>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<IEnumerable<UserQuickSearchDto>>>> QuickSearch(
             [FromQuery] string query,
             [FromQuery] int limit = 10)
         {
             try
             {
-                var userId = GetCurrentUserId();
-                if (!userId.HasValue)
+                // Return empty list for invalid input to not break UI
+                if (!IsAuthenticated || !CurrentUserId.HasValue ||
+                    string.IsNullOrWhiteSpace(query) || query.Length < 2)
                 {
-                    return Unauthorized();
+                    return Success(Enumerable.Empty<UserQuickSearchDto>(), "No results");
                 }
 
-                if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
-                {
-                    return Ok(Enumerable.Empty<UserQuickSearchDto>());
-                }
+                var result = await _contactService.QuickSearchAsync(
+                    CurrentUserId.Value,
+                    query,
+                    limit);
 
-                var result = await _contactService.QuickSearchAsync(userId.Value, query, limit);
-                return Ok(result);
+                // Set cache control for autocomplete
+                _responseHeaderService.SetCacheControl("private, max-age=60");
+
+                return Success(result, $"Found {result?.Count() ?? 0} suggestions");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in quick search");
-                return Ok(Enumerable.Empty<UserQuickSearchDto>()); // Don't break autocomplete
+                _logger.LogError(ex,
+                    "Error in quick search - Query: {Query} | UserId: {UserId} | TraceId: {TraceId}",
+                    query, CurrentUserId, TraceId);
+
+                // Don't break autocomplete on the client
+                return Success(Enumerable.Empty<UserQuickSearchDto>(), "Search unavailable");
             }
         }
 
         /// <summary>
         /// Get user's contacts
         /// </summary>
-        /// <param name="pageNumber">Page number</param>
-        /// <param name="pageSize">Page size</param>
-        /// <returns>List of user's contacts</returns>
         [HttpGet]
-        [ProducesResponseType(typeof(IPagedList<ContactDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> GetContacts(
+        [ProducesResponseType(typeof(ApiResponse<IPagedList<ContactDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ApiResponse<IPagedList<ContactDto>>>> GetContacts(
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 20)
         {
             try
             {
-                var userId = GetCurrentUserId();
-                if (!userId.HasValue)
+                if (!IsAuthenticated || !CurrentUserId.HasValue)
                 {
-                    return Unauthorized();
+                    return Failure<IPagedList<ContactDto>>(
+                        null,
+                        "User is not authorized.",
+                        StatusCodes.Status401Unauthorized);
                 }
 
                 var result = await _contactService.GetContactsAsync(
-                    userId.Value,
+                    CurrentUserId.Value,
                     pageNumber,
                     pageSize);
 
-                return Ok(result);
+                // Set pagination headers
+                if (result != null)
+                {
+                    _responseHeaderService.SetPaginationHeaders(new PaginationMetadata
+                    {
+                        CurrentPage = pageNumber,
+                        PageSize = result.PageSize,
+                        TotalPages = result.TotalPages,
+                        TotalCount = result.TotalCount,
+                        HasNext = result.HasNextPage,
+                        HasPrevious = result.HasPreviousPage
+                    });
+                }
+
+                return Success(result, $"Retrieved {result?.Count ?? 0} contacts");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting contacts");
-                return StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse
-                {
-                    Message = "An error occurred while getting contacts",
-                    Code = "INTERNAL_ERROR"
-                });
+                _logger.LogError(ex,
+                    "Error getting contacts - UserId: {UserId} | TraceId: {TraceId}",
+                    CurrentUserId, TraceId);
+
+                return Failure<IPagedList<ContactDto>>(
+                    null,
+                    "An internal error occurred while getting contacts.",
+                    StatusCodes.Status500InternalServerError);
             }
         }
 
         /// <summary>
         /// Get pending contact requests
         /// </summary>
-        /// <param name="direction">Request direction (sent/received/both)</param>
-        /// <returns>List of pending requests</returns>
-        [HttpGet("requests")]
-        [ProducesResponseType(typeof(IEnumerable<ContactRequestDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> GetPendingRequests(
+        [HttpGet]
+        [ProducesResponseType(typeof(ApiResponse<IEnumerable<ContactRequestDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ApiResponse<IEnumerable<ContactRequestDto>>>> GetPendingRequests(
             [FromQuery] RequestDirection direction = RequestDirection.Both)
         {
             try
             {
-                var userId = GetCurrentUserId();
-                if (!userId.HasValue)
+                if (!IsAuthenticated || !CurrentUserId.HasValue)
                 {
-                    return Unauthorized();
+                    return Failure<IEnumerable<ContactRequestDto>>(
+                        null,
+                        "User is not authorized.",
+                        StatusCodes.Status401Unauthorized);
                 }
 
-                var result = await _contactService.GetPendingRequestsAsync(userId.Value, direction);
-                return Ok(result);
+                var result = await _contactService.GetPendingRequestsAsync(
+                    CurrentUserId.Value,
+                    direction);
+
+                return Success(result, $"Retrieved {result?.Count() ?? 0} pending requests");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting pending requests");
-                return StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse
-                {
-                    Message = "An error occurred while getting pending requests",
-                    Code = "INTERNAL_ERROR"
-                });
+                _logger.LogError(ex,
+                    "Error getting pending requests - UserId: {UserId} | Direction: {Direction} | TraceId: {TraceId}",
+                    CurrentUserId, direction, TraceId);
+
+                return Failure<IEnumerable<ContactRequestDto>>(
+                    null,
+                    "An internal error occurred while getting pending requests.",
+                    StatusCodes.Status500InternalServerError);
             }
         }
 
         /// <summary>
         /// Send contact request
         /// </summary>
-        /// <param name="request">Contact request details</param>
-        /// <returns>Created contact request</returns>
-        [HttpPost("request")]
-        [ProducesResponseType(typeof(ContactDto), StatusCodes.Status201Created)]
-        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> SendContactRequest([FromBody] SendContactRequestDto request)
+        [HttpPost]
+        [ProducesResponseType(typeof(ApiResponse<ContactDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ApiResponse<ContactDto>>> SendContactRequest(
+            [FromBody] SendContactRequestDto request)
         {
             try
             {
-                var userId = GetCurrentUserId();
-                if (!userId.HasValue)
+                if (!IsAuthenticated || !CurrentUserId.HasValue)
                 {
-                    return Unauthorized();
+                    return Failure<ContactDto>(
+                        null,
+                        "User is not authorized.",
+                        StatusCodes.Status401Unauthorized);
                 }
 
                 if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+                {
+                    return Failure<ContactDto>(
+                        null,
+                        "Invalid request data.",
+                        StatusCodes.Status400BadRequest);
+                }
 
                 var result = await _contactService.SendRequestAsync(
-                    userId.Value,
+                    CurrentUserId.Value,
                     request.AddresseeId,
                     request.Message);
 
-                return CreatedAtAction(
-                    nameof(GetContact),
-                    new { id = result.Id },
-                    result);
+                _logger.LogInformation(
+                    "Contact request sent - From: {UserId} To: {AddresseeId} | TraceId: {TraceId}",
+                    CurrentUserId, request.AddresseeId, TraceId);
+
+                return Success(result,"Contact request created successfully.");
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(new ErrorResponse
-                {
-                    Message = ex.Message,
-                    Code = "INVALID_REQUEST"
-                });
+                return Failure<ContactDto>(
+                    null,
+                    ex.Message,
+                    StatusCodes.Status400BadRequest);
             }
             catch (NotFoundException ex)
             {
-                return NotFound(new ErrorResponse
-                {
-                    Message = ex.Message,
-                    Code = "NOT_FOUND"
-                });
+                return Failure<ContactDto>(
+                    null,
+                    ex.Message,
+                    StatusCodes.Status404NotFound);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending contact request");
-                return StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse
-                {
-                    Message = "An error occurred while sending contact request",
-                    Code = "INTERNAL_ERROR"
-                });
+                _logger.LogError(ex,
+                    "Error sending contact request - UserId: {UserId} | AddresseeId: {AddresseeId} | TraceId: {TraceId}",
+                    CurrentUserId, request.AddresseeId, TraceId);
+
+                return Failure<ContactDto>(
+                    null,
+                    "An internal error occurred while sending the contact request.",
+                    StatusCodes.Status500InternalServerError);
             }
         }
 
         /// <summary>
         /// Accept contact request
         /// </summary>
-        /// <param name="id">Contact request ID</param>
-        /// <returns>Success confirmation</returns>
-        [HttpPost("{id}/accept")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> AcceptRequest(long id)
+        [HttpPost]
+        [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ApiResponse<bool>>> AcceptRequest(
+            [FromQuery] long id)
         {
             try
             {
-                var userId = GetCurrentUserId();
-                if (!userId.HasValue)
+                if (!IsAuthenticated || !CurrentUserId.HasValue)
                 {
-                    return Unauthorized();
+                    return Failure<bool>(
+                        false,
+                        "User is not authorized.",
+                        StatusCodes.Status401Unauthorized);
                 }
 
-                var result = await _contactService.AcceptRequestAsync(id, userId.Value);
+                var accepted = await _contactService.AcceptRequestAsync(id, CurrentUserId.Value);
 
-                if (result)
+                if (accepted)
                 {
-                    return Ok(new { message = "Contact request accepted successfully" });
+                    _logger.LogInformation(
+                        "Contact request accepted - RequestId: {RequestId} | UserId: {UserId} | TraceId: {TraceId}",
+                        id, CurrentUserId, TraceId);
+
+                    return Success(
+                        true,
+                        "Contact request accepted successfully.");
                 }
 
-                return BadRequest(new ErrorResponse
-                {
-                    Message = "Failed to accept contact request",
-                    Code = "ACCEPT_FAILED"
-                });
+                return Failure<bool>(
+                    false,
+                    "Failed to accept contact request.",
+                    StatusCodes.Status400BadRequest);
             }
             catch (NotFoundException ex)
             {
-                return NotFound(new ErrorResponse
-                {
-                    Message = ex.Message,
-                    Code = "NOT_FOUND"
-                });
+                return Failure<bool>(
+                    false,
+                    ex.Message,
+                    StatusCodes.Status404NotFound);
             }
             catch (UnauthorizedException ex)
             {
-                return Unauthorized(new ErrorResponse
-                {
-                    Message = ex.Message,
-                    Code = "UNAUTHORIZED"
-                });
+                return Failure<bool>(
+                    false,
+                    ex.Message,
+                    StatusCodes.Status403Forbidden);
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(new ErrorResponse
-                {
-                    Message = ex.Message,
-                    Code = "INVALID_OPERATION"
-                });
+                return Failure<bool>(
+                    false,
+                    ex.Message,
+                    StatusCodes.Status400BadRequest);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error accepting contact request");
-                return StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse
-                {
-                    Message = "An error occurred while accepting contact request",
-                    Code = "INTERNAL_ERROR"
-                });
+                _logger.LogError(ex,
+                    "Error accepting contact request - RequestId: {RequestId} | UserId: {UserId} | TraceId: {TraceId}",
+                    id, CurrentUserId, TraceId);
+
+                return Failure<bool>(
+                    false,
+                    "An internal error occurred while accepting the request.",
+                    StatusCodes.Status500InternalServerError);
             }
         }
 
         /// <summary>
         /// Reject contact request
         /// </summary>
-        /// <param name="id">Contact request ID</param>
-        /// <param name="request">Rejection details</param>
-        /// <returns>Success confirmation</returns>
-        [HttpPost("{id}/reject")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> RejectRequest(long id, [FromBody] RejectRequestDto request = null)
+        [HttpPost]
+        [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ApiResponse<bool>>> RejectRequest(
+            [FromQuery] long id,
+            [FromBody] RejectRequestDto request = null)
         {
             try
             {
-                var userId = GetCurrentUserId();
-                if (!userId.HasValue)
+                if (!IsAuthenticated || !CurrentUserId.HasValue)
                 {
-                    return Unauthorized();
+                    return Failure<bool>(
+                        false,
+                        "User is not authorized.",
+                        StatusCodes.Status401Unauthorized);
                 }
 
-                var result = await _contactService.RejectRequestAsync(
+                var rejected = await _contactService.RejectRequestAsync(
                     id,
-                    userId.Value,
+                    CurrentUserId.Value,
                     request?.Reason);
 
-                if (result)
+                if (rejected)
                 {
-                    return Ok(new { message = "Contact request rejected" });
+                    _logger.LogInformation(
+                        "Contact request rejected - RequestId: {RequestId} | UserId: {UserId} | Reason: {Reason} | TraceId: {TraceId}",
+                        id, CurrentUserId, request?.Reason, TraceId);
+
+                    return Success(
+                        true,
+                        "Contact request rejected.");
                 }
 
-                return BadRequest(new ErrorResponse
-                {
-                    Message = "Failed to reject contact request",
-                    Code = "REJECT_FAILED"
-                });
+                return Failure<bool>(
+                    false,
+                    "Failed to reject contact request.",
+                    StatusCodes.Status400BadRequest);
             }
             catch (NotFoundException ex)
             {
-                return NotFound(new ErrorResponse
-                {
-                    Message = ex.Message,
-                    Code = "NOT_FOUND"
-                });
+                return Failure<bool>(
+                    false,
+                    ex.Message,
+                    StatusCodes.Status404NotFound);
             }
             catch (UnauthorizedException ex)
             {
-                return Unauthorized(new ErrorResponse
-                {
-                    Message = ex.Message,
-                    Code = "UNAUTHORIZED"
-                });
+                return Failure<bool>(
+                    false,
+                    ex.Message,
+                    StatusCodes.Status403Forbidden);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error rejecting contact request");
-                return StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse
-                {
-                    Message = "An error occurred while rejecting contact request",
-                    Code = "INTERNAL_ERROR"
-                });
-            }
-        }
+                _logger.LogError(ex,
+                    "Error rejecting contact request - RequestId: {RequestId} | UserId: {UserId} | TraceId: {TraceId}",
+                    id, CurrentUserId, TraceId);
 
-        /// <summary>
-        /// Cancel sent contact request
-        /// </summary>
-        /// <param name="id">Contact request ID</param>
-        /// <returns>Success confirmation</returns>
-        [HttpDelete("request/{id}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> CancelRequest(long id)
-        {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (!userId.HasValue)
-                {
-                    return Unauthorized();
-                }
-
-                var result = await _contactService.CancelRequestAsync(id, userId.Value);
-
-                if (result)
-                {
-                    return Ok(new { message = "Contact request cancelled" });
-                }
-
-                return BadRequest(new ErrorResponse
-                {
-                    Message = "Failed to cancel contact request",
-                    Code = "CANCEL_FAILED"
-                });
-            }
-            catch (NotFoundException ex)
-            {
-                return NotFound(new ErrorResponse
-                {
-                    Message = ex.Message,
-                    Code = "NOT_FOUND"
-                });
-            }
-            catch (UnauthorizedException ex)
-            {
-                return Unauthorized(new ErrorResponse
-                {
-                    Message = ex.Message,
-                    Code = "UNAUTHORIZED"
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error cancelling contact request");
-                return StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse
-                {
-                    Message = "An error occurred while cancelling contact request",
-                    Code = "INTERNAL_ERROR"
-                });
-            }
-        }
-
-        /// <summary>
-        /// Remove contact
-        /// </summary>
-        /// <param name="id">Contact ID</param>
-        /// <returns>Success confirmation</returns>
-        [HttpDelete("{id}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> RemoveContact(long id)
-        {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (!userId.HasValue)
-                {
-                    return Unauthorized();
-                }
-
-                var result = await _contactService.RemoveContactAsync(id, userId.Value);
-
-                if (result)
-                {
-                    return Ok(new { message = "Contact removed successfully" });
-                }
-
-                return BadRequest(new ErrorResponse
-                {
-                    Message = "Failed to remove contact",
-                    Code = "REMOVE_FAILED"
-                });
-            }
-            catch (NotFoundException ex)
-            {
-                return NotFound(new ErrorResponse
-                {
-                    Message = ex.Message,
-                    Code = "NOT_FOUND"
-                });
-            }
-            catch (UnauthorizedException ex)
-            {
-                return Unauthorized(new ErrorResponse
-                {
-                    Message = ex.Message,
-                    Code = "UNAUTHORIZED"
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error removing contact");
-                return StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse
-                {
-                    Message = "An error occurred while removing contact",
-                    Code = "INTERNAL_ERROR"
-                });
+                return Failure<bool>(
+                    false,
+                    "An internal error occurred while rejecting the request.",
+                    StatusCodes.Status500InternalServerError);
             }
         }
 
         /// <summary>
         /// Get single contact details
         /// </summary>
-        /// <param name="id">Contact ID</param>
-        /// <returns>Contact details</returns>
-        [HttpGet("{id}")]
-        [ProducesResponseType(typeof(ContactDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> GetContact(long id)
+        [HttpGet]
+        [ProducesResponseType(typeof(ApiResponse<ContactDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ApiResponse<ContactDto>>> GetContact([FromQuery] long id)
         {
             try
             {
-                var userId = GetCurrentUserId();
-                if (!userId.HasValue)
+                if (!IsAuthenticated || !CurrentUserId.HasValue)
                 {
-                    return Unauthorized();
+                    return Failure<ContactDto>(
+                        null,
+                        "User is not authorized.",
+                        StatusCodes.Status401Unauthorized);
                 }
 
-                // Implementation would fetch specific contact
-                // This is a placeholder
-                return Ok(new ContactDto { Id = id });
+                var contact = await _contactService.GetContactByIdAsync(id, CurrentUserId.Value);
+
+                if (contact == null)
+                {
+                    return Failure<ContactDto>(
+                        null,
+                        "Contact not found.",
+                        StatusCodes.Status404NotFound);
+                }
+
+                return Success(contact, "Contact retrieved successfully.");
+            }
+            catch (NotFoundException ex)
+            {
+                return Failure<ContactDto>(
+                    null,
+                    ex.Message,
+                    StatusCodes.Status404NotFound);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting contact");
-                return StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse
+                _logger.LogError(ex,
+                    "Error getting contact - ContactId: {ContactId} | UserId: {UserId} | TraceId: {TraceId}",
+                    id, CurrentUserId, TraceId);
+
+                return Failure<ContactDto>(
+                    null,
+                    "An error occurred while getting the contact.",
+                    StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        /// <summary>
+        /// Cancel a sent contact request
+        /// </summary>
+        [HttpDelete]
+        [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ApiResponse<bool>>> CancelRequest(
+            [FromQuery] long id)
+        {
+            try
+            {
+                if (!IsAuthenticated || !CurrentUserId.HasValue)
                 {
-                    Message = "An error occurred while getting contact",
-                    Code = "INTERNAL_ERROR"
-                });
+                    return Failure<bool>(
+                        false,
+                        "User is not authorized.",
+                        StatusCodes.Status401Unauthorized);
+                }
+
+                var cancelled = await _contactService.CancelRequestAsync(id, CurrentUserId.Value);
+
+                if (cancelled)
+                {
+                    _logger.LogInformation(
+                        "Contact request cancelled - RequestId: {RequestId} | UserId: {UserId} | TraceId: {TraceId}",
+                        id, CurrentUserId, TraceId);
+
+                    return Success(
+                        true,
+                        "Contact request cancelled.");
+                }
+
+                return Failure<bool>(
+                    false,
+                    "Failed to cancel contact request.",
+                    StatusCodes.Status400BadRequest);
+            }
+            catch (NotFoundException ex)
+            {
+                return Failure<bool>(
+                    false,
+                    ex.Message,
+                    StatusCodes.Status404NotFound);
+            }
+            catch (UnauthorizedException ex)
+            {
+                return Failure<bool>(
+                    false,
+                    ex.Message,
+                    StatusCodes.Status403Forbidden);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Error cancelling contact request - RequestId: {RequestId} | UserId: {UserId} | TraceId: {TraceId}",
+                    id, CurrentUserId, TraceId);
+
+                return Failure<bool>(
+                    false,
+                    "An internal error occurred while cancelling the request.",
+                    StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        /// <summary>
+        /// Remove a contact
+        /// </summary>
+        [HttpDelete]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ApiResponse<object>>> RemoveContact([FromQuery] long contactId)
+        {
+            try
+            {
+                if (!IsAuthenticated || !CurrentUserId.HasValue)
+                {
+                    return Failure<object>(
+                        null,
+                        "User is not authorized.",
+                        StatusCodes.Status401Unauthorized);
+                }
+
+                var removed = await _contactService.RemoveContactAsync(CurrentUserId.Value, contactId);
+
+                if (removed)
+                {
+                    _logger.LogInformation(
+                        "Contact removed - ContactId: {ContactId} | UserId: {UserId} | TraceId: {TraceId}",
+                        contactId, CurrentUserId, TraceId);
+
+                    return Success<object>(null, "Contact removed successfully.");
+                }
+
+                return Failure<object>(
+                    null,
+                    "Failed to remove contact.",
+                    StatusCodes.Status400BadRequest);
+            }
+            catch (NotFoundException ex)
+            {
+                return Failure<object>(
+                    null,
+                    ex.Message,
+                    StatusCodes.Status404NotFound);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Error removing contact - ContactId: {ContactId} | UserId: {UserId} | TraceId: {TraceId}",
+                    contactId, CurrentUserId, TraceId);
+
+                return Failure<object>(
+                    null,
+                    "An internal error occurred while removing the contact.",
+                    StatusCodes.Status500InternalServerError);
             }
         }
 
         /// <summary>
         /// Block a user
         /// </summary>
-        /// <param name="request">Block request details</param>
-        /// <returns>Success confirmation</returns>
-        [HttpPost("block")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> BlockUser([FromBody] BlockUserDto request)
+        [HttpPost]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ApiResponse<object>>> BlockUser(
+            [FromQuery] long userToBlockId,
+            [FromBody] BlockUserDto request = null)
         {
             try
             {
-                var userId = GetCurrentUserId();
-                if (!userId.HasValue)
+                if (!IsAuthenticated || !CurrentUserId.HasValue)
                 {
-                    return Unauthorized();
+                    return Failure<object>(
+                        null,
+                        "User is not authorized.",
+                        StatusCodes.Status401Unauthorized);
                 }
 
-                if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+                var blocked = await _contactService.BlockUserAsync(
+                    CurrentUserId.Value,
+                    userToBlockId,
+                    request?.Reason);
 
-                var result = await _contactService.BlockUserAsync(
-                    userId.Value,
-                    request.UserToBlockId,
-                    request.Reason);
-
-                if (result)
+                if (blocked)
                 {
-                    return Ok(new { message = "User blocked successfully" });
+                    _logger.LogInformation(
+                        "User blocked - BlockedUserId: {BlockedUserId} | UserId: {UserId} | TraceId: {TraceId}",
+                        userToBlockId, CurrentUserId, TraceId);
+
+                    return Success<object>(null, "User blocked successfully.");
                 }
 
-                return BadRequest(new ErrorResponse
-                {
-                    Message = "Failed to block user",
-                    Code = "BLOCK_FAILED"
-                });
+                return Failure<object>(
+                    null,
+                    "Failed to block user.",
+                    StatusCodes.Status400BadRequest);
+            }
+            catch (NotFoundException ex)
+            {
+                return Failure<object>(
+                    null,
+                    ex.Message,
+                    StatusCodes.Status404NotFound);
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(new ErrorResponse
-                {
-                    Message = ex.Message,
-                    Code = "INVALID_OPERATION"
-                });
+                return Failure<object>(
+                    null,
+                    ex.Message,
+                    StatusCodes.Status400BadRequest);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error blocking user");
-                return StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse
-                {
-                    Message = "An error occurred while blocking user",
-                    Code = "INTERNAL_ERROR"
-                });
+                _logger.LogError(ex,
+                    "Error blocking user - UserToBlockId: {UserToBlockId} | UserId: {UserId} | TraceId: {TraceId}",
+                    userToBlockId, CurrentUserId, TraceId);
+
+                return Failure<object>(
+                    null,
+                    "An internal error occurred while blocking the user.",
+                    StatusCodes.Status500InternalServerError);
             }
         }
 
         /// <summary>
         /// Unblock a user
         /// </summary>
-        /// <param name="userToUnblockId">User ID to unblock</param>
-        /// <returns>Success confirmation</returns>
-        [HttpDelete("block/{userToUnblockId}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> UnblockUser(long userToUnblockId)
+        [HttpDelete]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ApiResponse<object>>> UnblockUser(
+            [FromQuery] long userToUnblockId)
         {
             try
             {
-                var userId = GetCurrentUserId();
-                if (!userId.HasValue)
+                if (!IsAuthenticated || !CurrentUserId.HasValue)
                 {
-                    return Unauthorized();
+                    return Failure<object>(
+                        null,
+                        "User is not authorized.",
+                        StatusCodes.Status401Unauthorized);
                 }
 
-                var result = await _contactService.UnblockUserAsync(userId.Value, userToUnblockId);
+                var unblocked = await _contactService.UnblockUserAsync(
+                    CurrentUserId.Value,
+                    userToUnblockId);
 
-                if (result)
+                if (unblocked)
                 {
-                    return Ok(new { message = "User unblocked successfully" });
+                    _logger.LogInformation(
+                        "User unblocked - UnblockedUserId: {UnblockedUserId} | UserId: {UserId} | TraceId: {TraceId}",
+                        userToUnblockId, CurrentUserId, TraceId);
+
+                    return Success<object>(null, "User unblocked successfully.");
                 }
 
-                return BadRequest(new ErrorResponse
-                {
-                    Message = "Failed to unblock user",
-                    Code = "UNBLOCK_FAILED"
-                });
+                return Failure<object>(
+                    null,
+                    "Failed to unblock user.",
+                    StatusCodes.Status400BadRequest);
             }
             catch (NotFoundException ex)
             {
-                return NotFound(new ErrorResponse
-                {
-                    Message = ex.Message,
-                    Code = "NOT_FOUND"
-                });
+                return Failure<object>(
+                    null,
+                    ex.Message,
+                    StatusCodes.Status404NotFound);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error unblocking user");
-                return StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse
-                {
-                    Message = "An error occurred while unblocking user",
-                    Code = "INTERNAL_ERROR"
-                });
+                _logger.LogError(ex,
+                    "Error unblocking user - UserToUnblockId: {UserToUnblockId} | UserId: {UserId} | TraceId: {TraceId}",
+                    userToUnblockId, CurrentUserId, TraceId);
+
+                return Failure<object>(
+                    null,
+                    "An internal error occurred while unblocking the user.",
+                    StatusCodes.Status500InternalServerError);
             }
         }
 
         /// <summary>
-        /// Get blocked users
+        /// Get blocked users list
         /// </summary>
-        /// <returns>List of blocked users</returns>
-        [HttpGet("blocked")]
-        [ProducesResponseType(typeof(IEnumerable<BlockedUserDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> GetBlockedUsers()
+        [HttpGet]
+        [ProducesResponseType(typeof(ApiResponse<IEnumerable<BlockedUserDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ApiResponse<IEnumerable<BlockedUserDto>>>> GetBlockedUsers()
         {
             try
             {
-                var userId = GetCurrentUserId();
-                if (!userId.HasValue)
+                if (!IsAuthenticated || !CurrentUserId.HasValue)
                 {
-                    return Unauthorized();
+                    return Failure<IEnumerable<BlockedUserDto>>(
+                        null,
+                        "User is not authorized.",
+                        StatusCodes.Status401Unauthorized);
                 }
 
-                var result = await _contactService.GetBlockedUsersAsync(userId.Value);
-                return Ok(result);
+                var blockedUsers = await _contactService.GetBlockedUsersAsync(CurrentUserId.Value);
+
+                return Success(blockedUsers, $"Retrieved {blockedUsers?.Count() ?? 0} blocked users");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting blocked users");
-                return StatusCode(StatusCodes.Status500InternalServerError, new ErrorResponse
-                {
-                    Message = "An error occurred while getting blocked users",
-                    Code = "INTERNAL_ERROR"
-                });
+                _logger.LogError(ex,
+                    "Error getting blocked users - UserId: {UserId} | TraceId: {TraceId}",
+                    CurrentUserId, TraceId);
+
+                return Failure<IEnumerable<BlockedUserDto>>(
+                    null,
+                    "An internal error occurred while getting blocked users.",
+                    StatusCodes.Status500InternalServerError);
             }
         }
 
-        #region Helper Methods
-
-        private long? GetCurrentUserId()
-        {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim != null && long.TryParse(userIdClaim.Value, out var userId))
-            {
-                return userId;
-            }
-            return null;
-        }
-
-        #endregion
+        
     }
 }

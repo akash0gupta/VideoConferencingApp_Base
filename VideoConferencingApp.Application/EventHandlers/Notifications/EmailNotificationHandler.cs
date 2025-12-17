@@ -4,8 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using VideoConferencingApp.Application.Interfaces.Common.IEventHandlerServices;
-using VideoConferencingApp.Application.Interfaces.Common.INotificationServices;
+using VideoConferencingApp.Application.Common.IEventHandlerServices;
+using VideoConferencingApp.Application.Common.INotificationServices;
 using VideoConferencingApp.Domain.Enums;
 using VideoConferencingApp.Domain.Events.Notification;
 

@@ -2,7 +2,7 @@
 using LinqToDB.Data;
 using System;
 using System.Linq.Expressions;
-using VideoConferencingApp.Domain.DTOs.Common;
+using VideoConferencingApp.Application.DTOs.Common;
 using VideoConferencingApp.Domain.Entities;
 using VideoConferencingApp.Domain.Interfaces;
 using VideoConferencingApp.Domain.Models;
@@ -26,7 +26,20 @@ namespace VideoConferencingApp.Infrastructure.Persistence.DataProvider.Repositor
             _transactionConnection = transactionConnection;
         }
 
-        public IQueryable<TEntity> Table => _dataProvider.GetTable<TEntity>();
+        public IQueryable<TEntity> Table
+        {
+            get
+            {
+                // If this repository was created by UnitOfWork, use the transaction connection.
+                if (_transactionConnection != null)
+                {
+                    return _transactionConnection.GetTable<TEntity>();
+                }
+
+                // Otherwise, use the standard provider (non-transactional)
+                return _dataProvider.GetTable<TEntity>();
+            }
+        }
 
         public async Task<TEntity?> GetByIdAsync(long id)
         {
@@ -118,6 +131,12 @@ namespace VideoConferencingApp.Infrastructure.Persistence.DataProvider.Repositor
             var items = await query.Skip(pageIndex * pageSize).Take(pageSize).ToListAsync();
 
             return new PagedList<TEntity>(items, pageIndex, pageSize, totalCount);
+        }
+
+        public async Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate)
+        {
+            if (predicate == null) throw new ArgumentNullException(nameof(predicate));
+            return await Table.CountAsync(predicate);
         }
     }
 }

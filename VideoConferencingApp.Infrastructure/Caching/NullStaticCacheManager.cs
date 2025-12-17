@@ -1,4 +1,4 @@
-﻿using VideoConferencingApp.Application.Interfaces.Common.ICommonServices;
+﻿using VideoConferencingApp.Application.Common.ICommonServices;
 using VideoConferencingApp.Domain.CacheKeys;
 using VideoConferencingApp.Infrastructure.Configuration;
 using VideoConferencingApp.Infrastructure.Configuration.Settings;
@@ -23,7 +23,7 @@ namespace VideoConferencingApp.Infrastructure.Caching
 
         public Task RemoveByPrefixAsync(string prefix, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-        public Task SetAsync<T>(CacheKey key, T data, TimeSpan? ttl = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task SetAsync<T>(CacheKey key, T data,CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public TimeSpan GetDefaultTtl() => TimeSpan.FromSeconds(_settings.DefaultCacheTimeSeconds);
         public TimeSpan GetShortTtl() => TimeSpan.FromSeconds(_settings.ShortCacheTimeSeconds);

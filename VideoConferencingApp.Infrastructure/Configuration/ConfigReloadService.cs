@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using VideoConferencingApp.Application.Interfaces.Common.ICommonServices;
+using VideoConferencingApp.Application.Common.ICommonServices;
 
 namespace VideoConferencingApp.Infrastructure.Configuration
 {

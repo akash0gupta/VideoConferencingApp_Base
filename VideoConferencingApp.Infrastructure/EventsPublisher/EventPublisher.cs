@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
+using VideoConferencingApp.Application.Common.ICommonServices;
+using VideoConferencingApp.Application.Common.IEventHandlerServices;
 using VideoConferencingApp.Application.Events;
-using VideoConferencingApp.Application.Interfaces.Common.ICommonServices;
-using VideoConferencingApp.Application.Interfaces.Common.IEventHandlerServices;
 using VideoConferencingApp.Domain.Events;
 
 namespace VideoConferencingApp.Infrastructure.EventsPublisher

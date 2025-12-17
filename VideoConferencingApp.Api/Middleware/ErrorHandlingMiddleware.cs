@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Text.Json;
+using VideoConferencingApp.Api.DTOs;
 using VideoConferencingApp.Domain.Exceptions;
 
 namespace VideoConferencingApp.Api.Middleware
@@ -29,26 +30,41 @@ namespace VideoConferencingApp.Api.Middleware
 
         private async Task HandleExceptionAsync(HttpContext context, Exception exception)
         {
-
             var statusCode = HttpStatusCode.InternalServerError;
-            object errorResponse = new { error = "An unexpected internal server error has occurred.", statusCode = (int)statusCode };
+            var traceId = context.TraceIdentifier;
+            object errorResponse = new
+            {
+                error = "An unexpected internal server error has occurred.",
+                statusCode = (int)statusCode,
+                traceId = traceId
+            };
+
             _logger.LogError(exception, "An unhandled exception has occurred: {ErrorMessage}", exception.Message);
 
             switch (exception)
             {
-
                 case ValidationException validationException:
                     statusCode = HttpStatusCode.BadRequest;
-                    errorResponse = new
+                    errorResponse = new ApiResponse<IDictionary<string, string[]>>
                     {
-                        title = "One or more validation errors occurred.",
-                        statusCode = (int)statusCode,
-                        errors = validationException.Errors
+                        Message = "validation errors",
+                        Timestamp = DateTime.UtcNow,
+                        Data = validationException.Errors,
+                        Success = false,
+                        TraceId = traceId
                     };
                     break;
+
                 case UnauthorizedAccessException unauthorizedAccessException:
                     statusCode = HttpStatusCode.Unauthorized;
-                    errorResponse = new { error = unauthorizedAccessException.Message, statusCode = (int)statusCode };
+                    errorResponse = new ApiResponse<string>
+                    {
+                        Data = "Unauthorized Access",
+                        Success = false,
+                        Message = unauthorizedAccessException.Message,
+                        Timestamp = DateTime.UtcNow,
+                        TraceId = traceId
+                    };
                     break;
             }
 

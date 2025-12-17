@@ -3,9 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
-using VideoConferencingApp.Application.Interfaces.Common.ICommonServices;
-using VideoConferencingApp.Application.Interfaces.Common.IEventHandlerServices;
+using VideoConferencingApp.Application.Common.ICommonServices;
+using VideoConferencingApp.Application.Common.IEventHandlerServices;
 using VideoConferencingApp.Domain.Events;
+using VideoConferencingApp.Infrastructure.Configuration;
 using VideoConferencingApp.Infrastructure.Configuration.Settings;
 
 namespace VideoConferencingApp.Infrastructure.Messaging.Kafka
@@ -21,12 +22,12 @@ namespace VideoConferencingApp.Infrastructure.Messaging.Kafka
 
         public KafkaProducer(
             KafkaConnection connection,
-            IOptions<MessageBrokerSettings> settings,
+            AppSettings settings,
             IServiceProvider serviceProvider,
             ILogger<KafkaProducer> logger)
         {
             _connection = connection;
-            _settings = settings.Value;
+            _settings = settings.Get<MessageBrokerSettings>();
             _serviceProvider = serviceProvider;
             _logger = logger;
         }

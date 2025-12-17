@@ -1,4 +1,5 @@
 using HealthChecks.UI.Client;
+using Mapster;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
@@ -12,7 +13,7 @@ using VideoConferencingApp.Infrastructure.Configuration.Settings;
 using VideoConferencingApp.Infrastructure.Extensions;
 using VideoConferencingApp.Infrastructure.Messaging.RabbitMq;
 using VideoConferencingApp.Infrastructure.Persistence.Migrations;
-using VideoConferencingApp.Infrastructure.RealTime;
+using VideoConferencingApp.Infrastructure.RealTime.Hubs;
 
 // --- 1. Configure Serilog ---
 Log.Logger = new LoggerConfiguration()
@@ -29,8 +30,14 @@ try
     builder.Host.UseSerilog((context, services, configuration) => configuration
         .ReadFrom.Configuration(context.Configuration) // Read settings from appsettings.json
         .ReadFrom.Services(services)
-        .Enrich.FromLogContext()
-        .WriteTo.Console()); // You can configure sinks here or in appsettings
+        .Enrich.FromLogContext());
+
+    // 1. Register Mapster configuration
+    var config = new TypeAdapterConfig();
+    config.Scan(AppDomain.CurrentDomain.GetAssemblies());
+
+    // 2. Register the configuration and the mapper
+    builder.Services.AddSingleton(config);
 
     builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 
@@ -48,8 +55,8 @@ try
 
     var app = builder.Build();
     app.RunMigrations();
-    app.UseMiddleware<ErrorHandlingMiddleware>();
-    app.UseMiddleware<SecurityHeadersMiddleware>();
+    app.UseCors("DefaultCorsPolicy");  
+    //app.UseMiddleware<SecurityHeadersMiddleware>();
     app.UseHttpsRedirection();
     app.UseStaticFiles();
     app.UseAuthentication();
@@ -64,8 +71,12 @@ try
         app.UseSwagger();
         app.UseSwaggerUI();
     }
+    else
+    {
+        app.UseMiddleware<ErrorHandlingMiddleware>();
+    }
     app.MapControllers();
-    app.MapHub<SecureCallHub>("/hubs/call");
+    app.MapHub<SignalsHub>("/hubs");
     app.Run();
 }
 catch (Exception ex)

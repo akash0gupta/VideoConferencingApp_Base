@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using VideoConferencingApp.Infrastructure.Services.AuthServices;
 
 namespace VideoConferencingApp.Infrastructure.Services
 {

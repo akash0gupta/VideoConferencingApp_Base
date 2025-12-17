@@ -5,7 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using VideoConferencingApp.Application.Interfaces.Common.ICommonServices;
+using VideoConferencingApp.Application.Common.ICommonServices;
 using VideoConferencingApp.Domain.CacheKeys;
 using VideoConferencingApp.Infrastructure.Configuration;
 using VideoConferencingApp.Infrastructure.Configuration.Settings;
@@ -88,20 +88,20 @@ namespace VideoConferencingApp.Infrastructure.Caching
             return value;
         }
 
-        public async Task SetAsync<T>(CacheKey key, T data, TimeSpan? ttl = null, CancellationToken cancellationToken = default)
+        public async Task SetAsync<T>(CacheKey key, T data, CancellationToken cancellationToken = default)
         {
             var composedKey = await ComposeKeyAsync(key, cancellationToken).ConfigureAwait(false);
 
             var distOptions = new DistributedCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = ttl ?? GetDefaultTtl()
+                AbsoluteExpirationRelativeToNow = key.Expiry ?? GetDefaultTtl()
             };
             await _distributed.SetAsync(composedKey, SerializationHelper.ToBytes(data), distOptions, cancellationToken)
                               .ConfigureAwait(false);
 
             _memory.Set(composedKey, data, new MemoryCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = ttl ?? GetDefaultTtl(),
+                AbsoluteExpirationRelativeToNow = key.Expiry ?? GetDefaultTtl(),
                 Size = 1
             });
         }

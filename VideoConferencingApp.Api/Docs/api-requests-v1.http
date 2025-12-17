@@ -1,0 +1,556 @@
+# Video Conferencing App API - HTTP Requests for Visual Studio
+# Updated with ALL endpoints
+
+### Variables
+@baseUrl = https://localhost:7157
+@version = 1
+@accessToken = {{$dotenv ACCESS_TOKEN}}
+@refreshToken = {{$dotenv REFRESH_TOKEN}}
+
+########################################
+# AUTH ENDPOINTS (13 total)
+########################################
+
+### Check Username Availability
+GET {{baseUrl}}/api/v{{version}}/Auth/CheckUsernameAvailability?username=akash
+
+### Check Email Availability
+GET {{baseUrl}}/api/v{{version}}/Auth/CheckEmailAvailability?email=john@example.com
+
+### Register New User
+POST {{baseUrl}}/api/v{{version}}/Auth/Register
+Content-Type: application/json
+{
+  "username": "Akash2",
+  "email": "akash2@example.com",
+  "password": "Akash@123",
+  "confirmPassword": "Akash@123",
+  "firstName": "Akash2",
+  "lastName": "G",
+  "acceptTerms": true,
+  "deviceInfo": {
+    "deviceToken": "FCM_TOKEN_HERE",
+    "platform": 0,
+    "deviceId": "device-123",
+    "deviceName": "John's iPhone",
+    "deviceModel": "iPhone 14 Pro",
+    "osVersion": "iOS 16.0",
+    "appVersion": "1.0.0"
+  }
+}
+
+### Login
+POST {{baseUrl}}/api/v{{version}}/Auth/Login
+Content-Type: application/json
+
+{
+  "usernameOrEmail": "Akash2",
+  "password": "Akash@123",
+  "rememberMe": true,
+  "deviceInfo": {
+    "deviceToken": "FCM_TOKEN_HERE",
+    "platform": 0,
+    "deviceId": "device-123",
+    "deviceName": "John's iPhone",
+    "deviceModel": "iPhone 14 Pro",
+    "osVersion": "iOS 16.0",
+    "appVersion": "1.0.0"
+  }
+}
+
+### Verify Two-Factor (During Login)
+POST {{baseUrl}}/api/v{{version}}/Auth/VerifyTwoFactor
+Content-Type: application/json
+
+{
+  "code": "123456",
+  "sessionToken": "session-token-from-login-response"
+}
+
+### Refresh Token
+POST {{baseUrl}}/api/v{{version}}/Auth/RefreshToken
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}",
+  "deviceToken": "FCM_TOKEN_HERE",
+  "ipAddress": "192.168.1.1",
+  "userAgent": "Mozilla/5.0"
+}
+
+### Logout
+POST {{baseUrl}}/api/v{{version}}/Auth/Logout
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "refreshToken": "{{refreshToken}}",
+  "sessionId": "session-123",
+  "deviceToken": "FCM_TOKEN_HERE",
+  "logoutFromAllDevices": false
+}
+
+### Get Current User
+GET {{baseUrl}}/api/v{{version}}/Auth/GetCurrentUser
+Authorization: Bearer {{accessToken}}
+
+### Get Current Devices
+GET {{baseUrl}}/api/v{{version}}/Auth/GetCurrentDevices
+Authorization: Bearer {{accessToken}}
+
+### Forgot Password
+POST {{baseUrl}}/api/v{{version}}/Auth/ForgotPassword
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "ipAddress": "192.168.1.1"
+}
+
+### Reset Password
+POST {{baseUrl}}/api/v{{version}}/Auth/ResetPassword
+Content-Type: application/json
+
+{
+  "token": "reset-token-from-email",
+  "newPassword": "NewSecureP@ssw0rd456",
+  "confirmPassword": "NewSecureP@ssw0rd456"
+}
+
+### Verify Email
+POST {{baseUrl}}/api/v{{version}}/Auth/VerifyEmail
+Content-Type: application/json
+
+{
+  "token": "verification-token-from-email"
+}
+
+### Resend Email Verification
+POST {{baseUrl}}/api/v{{version}}/Auth/ResendVerification
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com"
+}
+
+########################################
+# USER ENDPOINTS (10 total)
+########################################
+
+### Get User Profile
+GET {{baseUrl}}/api/v{{version}}/Users/GetProfile?id=1
+Authorization: Bearer {{accessToken}}
+
+### Update Profile
+PUT {{baseUrl}}/api/v{{version}}/Users/UpdateProfile
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "displayName": "John Doe",
+  "phoneNumber": "+1234567890",
+  "bio": "Software developer and tech enthusiast",
+  "username": "johndoe"
+}
+
+### Update Profile Picture
+POST {{baseUrl}}/api/v{{version}}/Users/UpdateProfilePicture
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="file"; filename="profile.jpg"
+Content-Type: image/jpeg
+
+< ./path/to/profile.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Delete Profile Picture
+DELETE {{baseUrl}}/api/v{{version}}/Users/DeleteProfilePicture
+Authorization: Bearer {{accessToken}}
+
+### Change Password
+POST {{baseUrl}}/api/v{{version}}/Users/ChangePassword
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "currentPassword": "OldP@ssw0rd123",
+  "newPassword": "NewP@ssw0rd456",
+  "confirmPassword": "NewP@ssw0rd456",
+  "logoutFromOtherDevices": true
+}
+
+### Enable Two-Factor Authentication
+POST {{baseUrl}}/api/v{{version}}/Users/EnableTwoFactor
+Authorization: Bearer {{accessToken}}
+
+### Verify Two-Factor Setup (Confirm)
+POST {{baseUrl}}/api/v{{version}}/Users/VerifyTwoFactor
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "userId": 1,
+  "code": "123456"
+}
+
+### Disable Two-Factor Authentication
+POST {{baseUrl}}/api/v{{version}}/Users/DisableTwoFactor
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+"password123"
+
+### Get Security Settings
+GET {{baseUrl}}/api/v{{version}}/Users/GetSecuritySettings
+Authorization: Bearer {{accessToken}}
+
+### Delete Account
+DELETE {{baseUrl}}/api/v{{version}}/Users/DeleteAccount
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "password": "SecureP@ssw0rd123",
+  "reason": "No longer need the account",
+  "confirmDeletion": true
+}
+
+########################################
+# CONTACT ENDPOINTS (13 total)
+########################################
+
+### Search Users
+GET {{baseUrl}}/api/v{{version}}/Contact/SearchUsers?query=john&pageNumber=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Quick Search Users
+GET {{baseUrl}}/api/v{{version}}/Contact/QuickSearch?query=john&limit=10
+Authorization: Bearer {{accessToken}}
+
+### Get Contacts
+GET {{baseUrl}}/api/v{{version}}/Contact/GetContacts?pageNumber=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Get Pending Contact Requests (Received)
+GET {{baseUrl}}/api/v{{version}}/Contact/GetPendingRequests?direction=0
+Authorization: Bearer {{accessToken}}
+
+### Get Pending Contact Requests (Sent)
+GET {{baseUrl}}/api/v{{version}}/Contact/GetPendingRequests?direction=1
+Authorization: Bearer {{accessToken}}
+
+### Send Contact Request
+POST {{baseUrl}}/api/v{{version}}/Contact/SendContactRequest
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "addresseeId": 2,
+  "message": "Hi! Let's connect."
+}
+
+### Accept Contact Request
+POST {{baseUrl}}/api/v{{version}}/Contact/AcceptRequest?id=1
+Authorization: Bearer {{accessToken}}
+
+### Reject Contact Request
+POST {{baseUrl}}/api/v{{version}}/Contact/RejectRequest?id=1
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "reason": "I don't know this person"
+}
+
+### Get Contact Details
+GET {{baseUrl}}/api/v{{version}}/Contact/GetContact?id=1
+Authorization: Bearer {{accessToken}}
+
+### Cancel Contact Request
+DELETE {{baseUrl}}/api/v{{version}}/Contact/CancelRequest?id=1
+Authorization: Bearer {{accessToken}}
+
+### Remove Contact
+DELETE {{baseUrl}}/api/v{{version}}/Contact/RemoveContact?contactId=1
+Authorization: Bearer {{accessToken}}
+
+### Block User
+POST {{baseUrl}}/api/v{{version}}/Contact/BlockUser?userToBlockId=2
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "userToBlockId": 2,
+  "reason": "Spam messages"
+}
+
+### Unblock User
+DELETE {{baseUrl}}/api/v{{version}}/Contact/UnblockUser?userToUnblockId=2
+Authorization: Bearer {{accessToken}}
+
+### Get Blocked Users
+GET {{baseUrl}}/api/v{{version}}/Contact/GetBlockedUsers
+Authorization: Bearer {{accessToken}}
+
+########################################
+# CALL HISTORY ENDPOINTS (4 total)
+########################################
+
+### Get Call History (All)
+GET {{baseUrl}}/api/v{{version}}/CallHistory/GetCallHistory?pageNumber=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Get Call History (Video Calls)
+GET {{baseUrl}}/api/v{{version}}/CallHistory/GetCallHistory?callType=1&pageNumber=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Get Call History (Missed)
+GET {{baseUrl}}/api/v{{version}}/CallHistory/GetCallHistory?status=3&pageNumber=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Get Call Statistics
+GET {{baseUrl}}/api/v{{version}}/CallHistory/GetCallStatistics/statistics?fromDate=2024-01-01T00:00:00Z&toDate=2024-12-31T23:59:59Z
+Authorization: Bearer {{accessToken}}
+
+### Get Missed Calls
+GET {{baseUrl}}/api/v{{version}}/CallHistory/GetMissedCalls/missed?pageNumber=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Delete Call History Entry
+DELETE {{baseUrl}}/api/v{{version}}/CallHistory/DeleteCallHistory/call-123-456
+Authorization: Bearer {{accessToken}}
+
+########################################
+# CHAT HISTORY ENDPOINTS (5 total)
+########################################
+
+### Get Direct Chat History
+GET {{baseUrl}}/api/v{{version}}/ChatHistory/GetDirectChatHistory?userId=user-123&pageNumber=1&pageSize=50
+Authorization: Bearer {{accessToken}}
+
+### Get Group Chat History
+GET {{baseUrl}}/api/v{{version}}/ChatHistory/GetGroupChatHistory?groupId=group-456&pageNumber=1&pageSize=50
+Authorization: Bearer {{accessToken}}
+
+### Get Conversations
+GET {{baseUrl}}/api/v{{version}}/ChatHistory/GetConversations?pageNumber=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Search Messages
+GET {{baseUrl}}/api/v{{version}}/ChatHistory/SearchMessages?query=hello&pageNumber=1&pageSize=50
+Authorization: Bearer {{accessToken}}
+
+### Search Messages in Direct Chat
+GET {{baseUrl}}/api/v{{version}}/ChatHistory/SearchMessages?query=hello&userId=user-123&pageNumber=1&pageSize=50
+Authorization: Bearer {{accessToken}}
+
+### Get Unread Count
+GET {{baseUrl}}/api/v{{version}}/ChatHistory/GetUnreadCount
+Authorization: Bearer {{accessToken}}
+
+########################################
+# FILE MANAGEMENT ENDPOINTS (19 total)
+########################################
+
+### Upload File
+POST {{baseUrl}}/api/v{{version}}/Files/UploadFile
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="File"; filename="document.pdf"
+Content-Type: application/pdf
+
+< ./path/to/document.pdf
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="Description"
+
+Important project document
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="Visibility"
+
+0
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="Tags"
+
+project,important,document
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="Encrypt"
+
+false
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Download File
+GET {{baseUrl}}/api/v{{version}}/Files/DownloadFile?id=1
+Authorization: Bearer {{accessToken}}
+
+### Get File Details
+GET {{baseUrl}}/api/v{{version}}/Files/GetFile?id=1
+Authorization: Bearer {{accessToken}}
+
+### Get My Files
+GET {{baseUrl}}/api/v{{version}}/Files/GetMyFiles?PageNumber=1&PageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Get My Files (Filtered)
+GET {{baseUrl}}/api/v{{version}}/Files/GetMyFiles?Query=document&Visibility=0&FileExtension=.pdf&PageNumber=1&PageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Update File
+PUT {{baseUrl}}/api/v{{version}}/Files/UpdateFile?id=1
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "fileName": "updated-document.pdf",
+  "description": "Updated description",
+  "visibility": 0,
+  "tags": "updated,tags"
+}
+
+### Delete File
+DELETE {{baseUrl}}/api/v{{version}}/Files/DeleteFile?id=1
+Authorization: Bearer {{accessToken}}
+
+### Delete Multiple Files
+POST {{baseUrl}}/api/v{{version}}/Files/DeleteMultipleFiles
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+[1, 2, 3, 4, 5]
+
+### Create Folder
+POST {{baseUrl}}/api/v{{version}}/Files/CreateFolder
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "folderName": "My Documents",
+  "parentFolderId": null,
+  "visibility": 0
+}
+
+### Get Folders
+GET {{baseUrl}}/api/v{{version}}/Files/GetFolders
+Authorization: Bearer {{accessToken}}
+
+### Delete Folder
+DELETE {{baseUrl}}/api/v{{version}}/Files/DeleteFolder?folderId=folder-123
+Authorization: Bearer {{accessToken}}
+
+### Move File
+POST {{baseUrl}}/api/v{{version}}/Files/MoveFile
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "fileId": 1,
+  "targetFolderId": "folder-123"
+}
+
+### Share File
+POST {{baseUrl}}/api/v{{version}}/Files/ShareFile
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "fileId": 1,
+  "sharedWithUserId": 2,
+  "permission": 0,
+  "expiresAt": "2024-12-31T23:59:59Z",
+  "password": "sharepass123",
+  "maxAccessCount": 10
+}
+
+### Get File Shares
+GET {{baseUrl}}/api/v{{version}}/Files/GetFileShares?fileId=1
+Authorization: Bearer {{accessToken}}
+
+### Revoke File Share
+DELETE {{baseUrl}}/api/v{{version}}/Files/RevokeShare?shareId=1
+Authorization: Bearer {{accessToken}}
+
+### Download Shared File
+GET {{baseUrl}}/api/v{{version}}/Files/DownloadShared?token=share-token-123&password=sharepass123
+
+### Get File Statistics
+GET {{baseUrl}}/api/v{{version}}/Files/GetStatistics
+Authorization: Bearer {{accessToken}}
+
+### Get File Access Logs
+GET {{baseUrl}}/api/v{{version}}/Files/GetFileAccessLogs?fileId=1
+Authorization: Bearer {{accessToken}}
+
+### Bulk File Operation (Change Visibility)
+POST {{baseUrl}}/api/v{{version}}/Files/BulkOperation
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "fileIds": [1, 2, 3],
+  "operation": 3,
+  "visibility": 1
+}
+
+### Bulk File Operation (Move Files)
+POST {{baseUrl}}/api/v{{version}}/Files/BulkOperation
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "fileIds": [1, 2, 3],
+  "operation": 2,
+  "targetFolderId": "folder-123"
+}
+
+### Check Storage Availability
+GET {{baseUrl}}/api/v{{version}}/Files/CheckStorageAvailability?fileSize=5242880
+Authorization: Bearer {{accessToken}}
+
+########################################
+# GROUP HISTORY ENDPOINTS (4 total)
+########################################
+
+### Get Group Activity
+GET {{baseUrl}}/api/v{{version}}/GroupHistory/GetGroupActivity/group-123/activity?pageNumber=1&pageSize=50
+Authorization: Bearer {{accessToken}}
+
+### Get Group Member History
+GET {{baseUrl}}/api/v{{version}}/GroupHistory/GetMemberHistory/group-123/member-history?pageNumber=1&pageSize=50
+Authorization: Bearer {{accessToken}}
+
+### Get Group Media
+GET {{baseUrl}}/api/v{{version}}/GroupHistory/GetGroupMedia/group-123/media?pageNumber=1&pageSize=50
+Authorization: Bearer {{accessToken}}
+
+### Get Group Media (Images Only)
+GET {{baseUrl}}/api/v{{version}}/GroupHistory/GetGroupMedia/group-123/media?mediaType=0&pageNumber=1&pageSize=50
+Authorization: Bearer {{accessToken}}
+
+### Get Shared Files in Group
+GET {{baseUrl}}/api/v{{version}}/GroupHistory/GetSharedFiles/group-123/files?pageNumber=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+########################################
+# ENUMS REFERENCE
+########################################
+
+# DevicePlatform: 0=iOS, 1=Android, 2=Web
+# CallsType: 0=Unknown, 1=Video, 2=Voice
+# CallStatus: 0=Pending, 1=Ringing, 2=InProgress, 3=Missed, 4=Completed, 5=Declined, 6=Failed, 7=Cancelled
+# CallDirection: 0=Incoming, 1=Outgoing
+# MessageType: 0=Text, 1=Image, 2=Video, 3=Audio, 4=File, 5=Location, 6=Contact, 99=System
+# MessageStatus: 0=Sending, 1=Sent, 2=Delivered, 3=Read, 4=Failed
+# ConversationType: 0=Direct, 1=Group
+# ContactStatus: 0=None, 1=Pending, 2=Accepted, 3=Declined, 4=Blocked
+# RequestDirection: 0=Received, 1=Sent, 2=Both
+# FileVisibility: 0=Private, 1=ContactsOnly, 2=Public
+# FilePermission: 0=View, 1=Download, 2=Edit, 3=Full
+# FileAccessType: 0=Upload, 1=Download, 2=View, 3=Edit, 4=Delete, 5=Share
+# BulkOperation: 0=Delete, 1=ChangeVisibility, 2=Move, 3=UpdateVisibility, 4=Copy
+# MediaType: 0=Image, 1=Video, 2=Audio, 3=Document
+# GroupActivityType: 0=Created, 1=MemberAdded, 2=MemberRemoved, 3=MemberLeft, 4=NameChanged, 5=DescriptionChanged, 6=AvatarChanged, 7=AdminAdded, 8=AdminRemoved
+# GroupMemberAction: 0=Added, 1=Removed, 2=Left, 3=PromotedToAdmin, 4=DemotedFromAdmin
+# UserRole: 0=User, 1=Moderator, 2=Admin, 3=SuperAdmin

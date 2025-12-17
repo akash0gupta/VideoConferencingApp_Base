@@ -6,9 +6,10 @@ using System.Threading.Tasks;
 
 namespace VideoConferencingApp.Domain.Events.Notification
 {
-    public class SendSmsNotificationEvent : NotificationEvent
+    public class SendSmsNotificationEvent : BaseEvent
     {
         public string PhoneNumber { get; set; }
         public string SmsBody { get; set; }
+        public long UserId { get; set; }
     }
 }

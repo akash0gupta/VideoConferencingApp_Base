@@ -7,6 +7,6 @@ namespace VideoConferencingApp.Domain.CacheKeys
         public const string GlobalPrefix = "app";
 
         public static CacheKey Build(params string[] parts)
-            => new CacheKey(string.Join(":", parts), GlobalPrefix);
+            => new CacheKey(string.Join(":", parts),null,GlobalPrefix);
     }
 }

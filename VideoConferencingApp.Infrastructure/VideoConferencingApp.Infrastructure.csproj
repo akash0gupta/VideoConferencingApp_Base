@@ -7,14 +7,17 @@
   </PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
 		<PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
 		<PackageReference Include="Confluent.Kafka" Version="2.11.1" />
+		<PackageReference Include="FirebaseAdmin" Version="3.4.0" />
 		<PackageReference Include="FluentMigrator" Version="7.1.0" />
 		<PackageReference Include="FluentMigrator.Runner" Version="7.1.0" />
 		<PackageReference Include="linq2db" Version="5.4.1" />
 		<PackageReference Include="MailKit" Version="4.14.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.9" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.2.0" />
+		<PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="9.0.7" />
 		<PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
 		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.4" />
 		<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.5" />
@@ -50,5 +53,9 @@
 	<ItemGroup>
     <ProjectReference Include="..\VideoConferencingApp.Application\VideoConferencingApp.Application.csproj" />
   </ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Caching\Presence\" />
+	</ItemGroup>
 
 </Project>

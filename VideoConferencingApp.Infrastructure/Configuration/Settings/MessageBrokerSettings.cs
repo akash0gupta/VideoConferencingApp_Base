@@ -1,4 +1,4 @@
-﻿using VideoConferencingApp.Application.Interfaces.Common.ICommonServices;
+﻿using VideoConferencingApp.Application.Common.ICommonServices;
 
 namespace VideoConferencingApp.Infrastructure.Configuration.Settings
 {
@@ -56,9 +56,9 @@ namespace VideoConferencingApp.Infrastructure.Configuration.Settings
         public string ExchangeName { get; set; } = "videoconferencing_events";
 
         /// <summary>
-        /// The type of the exchange (default: fanout, but could be direct/topic/headers).
+        /// The type of the exchange (default: direct, but could be direct/topic).
         /// </summary>
-        public string ExchangeType { get; set; } = "fanout";
+        public string ExchangeType { get; set; } = "direct";
 
         /// <summary>
         /// Whether the exchange should be durable.

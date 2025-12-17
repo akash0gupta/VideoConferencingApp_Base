@@ -6,7 +6,7 @@ namespace VideoConferencingApp.Domain.CacheKeys
 {
     public sealed class CacheKey
     {
-        public CacheKey(string key, params string[] prefixes)
+        public CacheKey(string key, TimeSpan? expiry = null, params string[] prefixes)
         {
             if (string.IsNullOrWhiteSpace(key))
                 throw new ArgumentException("Cache key cannot be null or whitespace.", nameof(key));
@@ -18,7 +18,15 @@ namespace VideoConferencingApp.Domain.CacheKeys
                 .ToArray() ?? Array.Empty<string>();
         }
 
+
+
         public string Key { get; }
+
+        /// <summary>
+        /// Gets the expiration time for the cache entry
+        /// </summary>
+        public TimeSpan? Expiry { get; }
+
         public IReadOnlyList<string> Prefixes { get; }
 
         public CacheKey WithPrefix(params string[] prefixes)
@@ -28,10 +36,10 @@ namespace VideoConferencingApp.Domain.CacheKeys
                                  .Distinct(StringComparer.Ordinal)
                                  .ToArray();
 
-            return new CacheKey(Key, merged);
+            return new CacheKey(Key,null, merged);
         }
 
-        public static CacheKey With(string key, params string[] prefixes) => new CacheKey(key, prefixes);
+        public static CacheKey With(string key, params string[] prefixes) => new CacheKey(key,null, prefixes);
 
         public override string ToString() => Key;
     }
