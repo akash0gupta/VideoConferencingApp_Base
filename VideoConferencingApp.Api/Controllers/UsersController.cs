@@ -1,6 +1,7 @@
 ﻿using MapsterMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using VideoConferencingApp.Api.Controllers.Base;
 using VideoConferencingApp.Api.DTOs;
 using VideoConferencingApp.Api.DTOs.ContactDto;
 using VideoConferencingApp.API.Controllers.Base;
@@ -19,7 +20,7 @@ using VideoConferencingApp.Infrastructure.Services.AuthServices;
 
 namespace VideoConferencingApp.API.Controllers
 {
-    public class UsersController : BaseController
+    public class UsersController : AuthorizeBaseController
     {
         private readonly IUserService _userService;
         private readonly IMapper _mapper;

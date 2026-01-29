@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
+using VideoConferencingApp.Api.Controllers.Base;
 using VideoConferencingApp.Api.DTOs;
 using VideoConferencingApp.API.Controllers.Base;
 using VideoConferencingApp.Application.DTOs.Authentication;
@@ -15,7 +16,7 @@ using VideoConferencingApp.Infrastructure.Services.AuthServices;
 namespace VideoConferencingApp.Api.Controllers
 {
 
-    public class FilesController : BaseController
+    public class FilesController : AuthorizeBaseController
     {
         private readonly IUserFileManagerService _fileService;
         private readonly IMapper _mapper;

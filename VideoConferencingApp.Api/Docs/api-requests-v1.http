@@ -2,10 +2,10 @@
 # Updated with ALL endpoints
 
 ### Variables
-@baseUrl = https://localhost:7157
+@baseUrl = {{baseUrl}}
 @version = 1
-@accessToken = {{$dotenv ACCESS_TOKEN}}
-@refreshToken = {{$dotenv REFRESH_TOKEN}}
+@accessToken = {{accessToken}}
+@refreshToken = {{refreshToken}}
 
 ########################################
 # AUTH ENDPOINTS (13 total)

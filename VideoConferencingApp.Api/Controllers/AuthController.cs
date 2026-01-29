@@ -50,7 +50,6 @@ namespace VideoConferencingApp.Controllers
         /// Check if username is available
         /// </summary>
         [HttpGet]
-        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
         public async Task<ActionResult<ApiResponse<bool>>> CheckUsernameAvailability(
             [FromQuery] string username)
@@ -82,7 +81,6 @@ namespace VideoConferencingApp.Controllers
         /// Check if email is available
         /// </summary>
         [HttpGet]
-        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
         public async Task<ActionResult<ApiResponse<bool>>> CheckEmailAvailability(
             [FromQuery] string email)
@@ -114,7 +112,6 @@ namespace VideoConferencingApp.Controllers
         /// Register a new user
         /// </summary>
         [HttpPost]
-        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<AuthenticationResultDto>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<ApiResponse<AuthenticationResultDto>>> Register(
@@ -202,7 +199,6 @@ namespace VideoConferencingApp.Controllers
         /// Authenticate user and get access token
         /// </summary>
         [HttpPost]
-        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<AuthenticationResultDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
         public async Task<ActionResult<ApiResponse<AuthenticationResultDto>>> Login(
@@ -279,7 +275,6 @@ namespace VideoConferencingApp.Controllers
         /// <param name="request">2FA verification request</param>
         /// <returns>Authentication result with tokens</returns>
         [HttpPost]
-        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<AuthenticationResultDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
         public async Task<ActionResult<ApiResponse<AuthenticationResultDto>>> VerifyTwoFactor([FromBody] VerifyTwoFactorDto request)
@@ -303,7 +298,6 @@ namespace VideoConferencingApp.Controllers
         /// Refresh access token
         /// </summary>
         [HttpPost]
-        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<AuthenticationResultDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
         public async Task<ActionResult<ApiResponse<AuthenticationResultDto>>> RefreshToken(
@@ -490,7 +484,6 @@ namespace VideoConferencingApp.Controllers
         /// <param name="request">Password reset request</param>
         /// <returns>Confirmation message</returns>
         [HttpPost]
-        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
         public async Task<ActionResult<ApiResponse<object>>> ForgotPassword([FromBody] PasswordResetRequestDto request)
@@ -526,7 +519,6 @@ namespace VideoConferencingApp.Controllers
         /// <param name="request">Password reset details</param>
         /// <returns>Confirmation message</returns>
         [HttpPost]
-        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -561,7 +553,6 @@ namespace VideoConferencingApp.Controllers
         /// <param name="request">Email verification token</param>
         /// <returns>Confirmation message</returns>
         [HttpPost]
-        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -596,7 +587,6 @@ namespace VideoConferencingApp.Controllers
         /// <param name="request">Email to resend verification</param>
         /// <returns>Confirmation message</returns>
         [HttpPost]
-        [AllowAnonymous]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]

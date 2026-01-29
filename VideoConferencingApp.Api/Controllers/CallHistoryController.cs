@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.VisualBasic;
 using VideoConferencingApp.Api.Controllers;
+using VideoConferencingApp.Api.Controllers.Base;
 using VideoConferencingApp.Api.DTOs;
 using VideoConferencingApp.API.Controllers.Base;
 using VideoConferencingApp.Application.DTOs.Authentication;
@@ -14,7 +15,7 @@ using VideoConferencingApp.Infrastructure.Services.AuthServices;
 
 namespace VideoConferencingApp.Api.Controllers
 {
-    public class CallHistoryController : BaseController
+    public class CallHistoryController : AuthorizeBaseController
     {
         private readonly ICallService _callService;
         private readonly ILogger<CallHistoryController> _logger;

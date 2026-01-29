@@ -10,7 +10,6 @@ namespace VideoConferencingApp.API.Controllers.Base
         [ApiController]
         [ApiVersion("1")]
         [Route("api/v{v:apiVersion}/[controller]/[action]")]
-        [Authorize]
         [Produces("application/json")]
         public abstract class BaseController : ControllerBase
         {

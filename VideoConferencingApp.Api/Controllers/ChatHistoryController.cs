@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using VideoConferencingApp.Api.Controllers.Base;
 using VideoConferencingApp.Api.DTOs;
 using VideoConferencingApp.API.Controllers.Base;
 using VideoConferencingApp.Application.DTOs.Chat;
@@ -8,7 +9,7 @@ using VideoConferencingApp.Infrastructure.Services.AuthServices;
 
 namespace VideoConferencingApp.Api.Controllers
 {
-    public class ChatHistoryController : BaseController
+    public class ChatHistoryController : AuthorizeBaseController
     {
         private readonly IChatService _chatService;
         private readonly IGroupService _groupService;

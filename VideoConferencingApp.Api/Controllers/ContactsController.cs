@@ -2,20 +2,21 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
+using VideoConferencingApp.Api.Controllers.Base;
 using VideoConferencingApp.Api.DTOs;
 using VideoConferencingApp.Api.DTOs.ContactDto;
 using VideoConferencingApp.API.Controllers.Base;
 using VideoConferencingApp.Application.DTOs.Authentication;
 using VideoConferencingApp.Application.DTOs.Contact;
+using VideoConferencingApp.Application.Services.ContactServices;
 using VideoConferencingApp.Domain.Enums;
 using VideoConferencingApp.Domain.Exceptions;
 using VideoConferencingApp.Domain.Interfaces;
-using VideoConferencingApp.Application.Services.ContactServices;
 using VideoConferencingApp.Infrastructure.Services.AuthServices;
 
 namespace VideoConferencingApp.Controllers
 {
-    public class ContactController : BaseController
+    public class ContactController : AuthorizeBaseController
     {
         private readonly IContactService _contactService;
         private readonly IMapper _mappingService;

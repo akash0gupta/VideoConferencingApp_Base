@@ -54,8 +54,4 @@
     <ProjectReference Include="..\VideoConferencingApp.Application\VideoConferencingApp.Application.csproj" />
   </ItemGroup>
 
-	<ItemGroup>
-	  <Folder Include="Caching\Presence\" />
-	</ItemGroup>
-
 </Project>
